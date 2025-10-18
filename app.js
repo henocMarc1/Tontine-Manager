@@ -1,38 +1,3 @@
-// Vérification de l'authentification
-function checkAuthentication() {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-        window.location.href = '../login.html';
-        return false;
-    }
-    
-    // Mettre à jour l'interface avec les infos utilisateur
-    updateUserInterface(currentUser);
-    return true;
-}
-
-// Récupérer l'utilisateur actuel
-function getCurrentUser() {
-    try {
-        return JSON.parse(localStorage.getItem('current_user') || 'null');
-    } catch (error) {
-        return null;
-    }
-}
-
-// Mettre à jour l'interface utilisateur
-function updateUserInterface(user) {
-    const userNameElement = document.querySelector('.user-info span');
-    if (userNameElement) {
-        userNameElement.textContent = `${user.firstName} ${user.lastName}`;
-    }
-}
-
-// Déconnexion
-function logout() {
-    localStorage.removeItem('current_user');
-    window.location.href = '../login.html';
-}
 
 // Application State
 let state = {
