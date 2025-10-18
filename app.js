@@ -335,10 +335,7 @@ async function initApp() {
                 }, 100);
                 
                 // Mettre à jour l'affichage de l'utilisateur
-                const userInfoSpan = document.querySelector('.user-info span');
-                if (userInfoSpan) {
-                    userInfoSpan.textContent = user.email || 'Utilisateur';
-                }
+                updateUserDisplay(user);
             } else {
                 // Utilisateur non connecté - rediriger vers la page de connexion
                 window.location.href = 'login.html';
@@ -348,6 +345,35 @@ async function initApp() {
     } catch (error) {
         console.error('Erreur lors de l\'initialisation:', error);
         showNotification('Erreur d\'initialisation de l\'application', 'error');
+    }
+}
+
+// Mettre à jour l'affichage de l'utilisateur connecté
+function updateUserDisplay(user) {
+    const userNameSpan = document.getElementById('current-user-name');
+    if (!userNameSpan) return;
+    
+    let displayName = 'Utilisateur';
+    
+    if (user) {
+        if (user.displayName) {
+            displayName = user.displayName;
+        } else if (user.email) {
+            // Extraire le nom depuis l'email (partie avant @)
+            const emailName = user.email.split('@')[0];
+            // Capitaliser la première lettre de chaque mot
+            displayName = emailName
+                .split(/[._-]/)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+        }
+    }
+    
+    userNameSpan.textContent = displayName;
+    
+    // Ajouter aussi une infobulle avec l'email complet
+    if (user && user.email) {
+        userNameSpan.title = `Connecté en tant que: ${user.email}`;
     }
 }
 
@@ -2085,7 +2111,7 @@ function checkRoundCompletion(tontineId, round) {
     }
 }
 
-function checkTontineCompletion(tontineId) {
+async function checkTontineCompletion(tontineId) {
     const tontine = state.tontines.find(t => t.id === tontineId);
     if (!tontine) return;
     
@@ -2132,14 +2158,18 @@ function checkTontineCompletion(tontineId) {
         });
         
         if (additionalPayments.length > 0) {
+            // Sauvegarder les paiements modifiés dans Firebase
+            for (const payment of additionalPayments) {
+                await savePaymentToDB(payment);
+            }
+            // Sauvegarder la tontine modifiée dans Firebase
+            await saveTontineToDB(tontine);
             showNotification(`${additionalPayments.length} paiement(s) traité(s) comme cagnotte rapportée`, 'info');
         }
-        
-        saveData();
     }
 }
 
-function processRoundPayout(tontineId, position) {
+async function processRoundPayout(tontineId, position) {
     const tontine = state.tontines.find(t => t.id === tontineId);
     if (!tontine) {
         showNotification('Tontine non trouvée', 'error');
@@ -2196,8 +2226,11 @@ function processRoundPayout(tontineId, position) {
         
         state.payments.push(payoutPayment);
         
+        // Sauvegarder le paiement dans Firebase
+        await savePaymentToDB(payoutPayment);
+        
         // Marquer le tour comme terminé et avancer au tour suivant
-        markRoundAsCompleted(tontineId, position);
+        await markRoundAsCompleted(tontineId, position);
         
         const tontineIndex = state.tontines.findIndex(t => t.id === tontineId);
         if (tontineIndex !== -1) {
@@ -2211,9 +2244,11 @@ function processRoundPayout(tontineId, position) {
             } else {
                 showNotification(`Tour ${position} terminé et marqué. Passage au tour ${position + 1}.`, 'success');
             }
+            
+            // Sauvegarder la tontine modifiée dans Firebase
+            await saveTontineToDB(state.tontines[tontineIndex]);
         }
         
-        saveData();
         showNotification(`Versement effectué avec succès à ${receiverMember.name}`, 'success');
         
         // Refresh the view
@@ -2442,58 +2477,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
-    // Ajouter des données de test si aucune données n'existent
-    initializeTestData();
 });
 
-// Fonction pour initialiser des données de test
-function initializeTestData() {
-    if (state.members.length === 0) {
-        console.log('Ajout de données de test...');
-        
-        // Ajouter quelques membres de test
-        const testMembers = [
-            {
-                id: generateId(),
-                name: 'ESDRAS',
-                email: 'marie.dubois@email.com',
-                phone: '+225 07 89 85 84 98',
-                cni: 'CNI123456',
-                address: '123 Rue de la République',
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: generateId(),
-                name: 'MARC',
-                email: 'jean.martin@email.com',
-                phone: '+225 05 45 47 79 23',
-                cni: 'CNI789123',
-                address: '456 Avenue des Champs',
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: generateId(),
-                name: 'HENOC',
-                email: 'sophie.laurent@email.com',
-                phone: '+225 ',
-                cni: 'CNI456789',
-                address: '789 Boulevard Saint-Michel',
-                createdAt: new Date().toISOString()
-            }
-        ];
-        
-        state.members = testMembers;
-        saveData();
-        console.log('Données de test ajoutées avec succès !');
-        
-        // Mettre à jour l'affichage si on est sur la section des membres
-        if (state.currentSection === 'members') {
-            renderMembers();
-        }
-        updateDashboard();
-    }
-}
 
 function getPaymentTypeText(type) {
     const typeMap = {
@@ -2736,7 +2721,7 @@ function activateModalDarkMode() {
 }
 
 // Fonction pour gérer les tours terminés avec badges
-function markRoundAsCompleted(tontineId, round) {
+async function markRoundAsCompleted(tontineId, round) {
     const tontine = state.tontines.find(t => t.id === tontineId);
     if (!tontine) return;
     
@@ -2748,7 +2733,9 @@ function markRoundAsCompleted(tontineId, round) {
     // Ajouter le tour aux tours terminés s'il n'y est pas déjà
     if (!tontine.completedRounds.includes(round)) {
         tontine.completedRounds.push(round);
-        saveData();
+        
+        // Sauvegarder la tontine modifiée dans Firebase
+        await saveTontineToDB(tontine);
         showNotification(`Tour ${round} marqué comme terminé`, 'success');
     }
 }
@@ -3432,8 +3419,24 @@ function importDatabase() {
                         state.tontines = data.tontines;
                         state.payments = data.payments;
                         
-                        saveData();
-                        showNotification('Base de données importée avec succès', 'success');
+                        // Sauvegarder toutes les données dans Firebase
+                        (async () => {
+                            try {
+                                for (const member of data.members) {
+                                    await saveMemberToDB(member);
+                                }
+                                for (const tontine of data.tontines) {
+                                    await saveTontineToDB(tontine);
+                                }
+                                for (const payment of data.payments) {
+                                    await savePaymentToDB(payment);
+                                }
+                                showNotification('Base de données importée avec succès dans Firebase', 'success');
+                            } catch (error) {
+                                console.error('Erreur lors de l\'importation dans Firebase:', error);
+                                showNotification('Erreur lors de l\'importation dans Firebase', 'error');
+                            }
+                        })();
                         
                         // Refresh current view
                         updateDashboard();
