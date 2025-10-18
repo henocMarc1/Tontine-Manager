@@ -7,7 +7,11 @@ import {
     signOut,
     onAuthStateChanged,
     GoogleAuthProvider,
-    signInWithPopup
+    signInWithPopup,
+    sendPasswordResetEmail,
+    updatePassword,
+    EmailAuthProvider,
+    reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 let auth = null;
@@ -122,6 +126,48 @@ function getCurrentUser() {
     return auth ? auth.currentUser : null;
 }
 
+// Réinitialiser le mot de passe
+async function resetPassword(email) {
+    try {
+        await sendPasswordResetEmail(auth, email);
+        return {
+            success: true,
+            message: 'Email de réinitialisation envoyé avec succès'
+        };
+    } catch (error) {
+        console.error('Erreur de réinitialisation:', error);
+        return {
+            success: false,
+            error: getErrorMessage(error.code)
+        };
+    }
+}
+
+// Changer le mot de passe
+async function changePassword(currentPassword, newPassword) {
+    try {
+        const user = auth.currentUser;
+        if (!user || !user.email) {
+            throw new Error('Utilisateur non connecté');
+        }
+        
+        const credential = EmailAuthProvider.credential(user.email, currentPassword);
+        await reauthenticateWithCredential(user, credential);
+        await updatePassword(user, newPassword);
+        
+        return {
+            success: true,
+            message: 'Mot de passe modifié avec succès'
+        };
+    } catch (error) {
+        console.error('Erreur de changement de mot de passe:', error);
+        return {
+            success: false,
+            error: getErrorMessage(error.code)
+        };
+    }
+}
+
 // Messages d'erreur en français
 function getErrorMessage(errorCode) {
     const errorMessages = {
@@ -132,10 +178,12 @@ function getErrorMessage(errorCode) {
         'auth/user-disabled': 'Ce compte a été désactivé.',
         'auth/user-not-found': 'Aucun compte ne correspond à cet email.',
         'auth/wrong-password': 'Mot de passe incorrect.',
+        'auth/invalid-credential': 'Identifiants incorrects. Vérifiez votre email et mot de passe.',
         'auth/too-many-requests': 'Trop de tentatives. Veuillez réessayer plus tard.',
         'auth/network-request-failed': 'Erreur de connexion. Vérifiez votre connexion internet.',
         'auth/popup-closed-by-user': 'La fenêtre de connexion a été fermée.',
-        'auth/cancelled-popup-request': 'Demande de connexion annulée.'
+        'auth/cancelled-popup-request': 'Demande de connexion annulée.',
+        'auth/requires-recent-login': 'Cette opération nécessite une connexion récente. Veuillez vous reconnecter.'
     };
     
     return errorMessages[errorCode] || 'Une erreur est survenue. Veuillez réessayer.';
@@ -148,5 +196,7 @@ export {
     loginWithGoogle,
     logout,
     checkAuthState,
-    getCurrentUser
+    getCurrentUser,
+    resetPassword,
+    changePassword
 };
