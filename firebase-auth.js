@@ -10,6 +10,7 @@ import {
     signInWithPopup,
     sendPasswordResetEmail,
     updatePassword,
+    updateProfile,
     EmailAuthProvider,
     reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -71,9 +72,17 @@ async function loginWithEmail(email, password) {
 }
 
 // Inscription avec email et mot de passe
-async function registerWithEmail(email, password) {
+async function registerWithEmail(email, password, displayName = null) {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        
+        // Mettre à jour le profil avec le nom si fourni
+        if (displayName) {
+            await updateProfile(userCredential.user, {
+                displayName: displayName
+            });
+        }
+        
         return {
             success: true,
             user: userCredential.user
