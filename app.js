@@ -1,4 +1,8 @@
 
+// Firebase imports - chargés dynamiquement
+let firebaseAuth, firebaseDB;
+let currentUser = null;
+
 // Application State
 let state = {
     members: [],
@@ -7,20 +11,41 @@ let state = {
     currentSection: 'dashboard'
 };
 
+// Initialiser Firebase
+async function initFirebase() {
+    try {
+        const { initFirebaseAuth, checkAuthState, getCurrentUser } = await import('./firebase-auth.js');
+        const { initFirestore, loadCollection, migrateFromIndexedDB } = await import('./firebase-db.js');
+        
+        // Initialiser Auth et Firestore
+        await initFirebaseAuth();
+        await initFirestore();
+        
+        console.log('Firebase initialisé avec succès');
+        return true;
+    } catch (error) {
+        console.error('Erreur d\'initialisation de Firebase:', error);
+        showNotification('Erreur de connexion à Firebase', 'error');
+        return false;
+    }
+}
+
 // Initialiser la base de données
 async function initDatabase() {
     try {
-        await tontineDB.init();
+        const { loadCollection, migrateFromIndexedDB } = await import('./firebase-db.js');
         
-        // Vérifier si la migration est nécessaire
-        const migrationState = await tontineDB.loadData('appState');
-        const isMigrated = migrationState.some(item => item.key === 'migrated');
-        
-        if (!isMigrated) {
-            await tontineDB.migrateFromLocalStorage();
+        // Vérifier si migration depuis IndexedDB nécessaire
+        const hasIndexedData = await checkIndexedDBData();
+        if (hasIndexedData) {
+            const shouldMigrate = confirm('Des données locales ont été détectées. Voulez-vous les migrer vers Firebase ?');
+            if (shouldMigrate) {
+                await migrateFromIndexedDB();
+                showNotification('Migration réussie !', 'success');
+            }
         }
         
-        // Charger les données
+        // Charger les données depuis Firestore
         await loadDataFromDB();
         
     } catch (error) {
@@ -29,21 +54,43 @@ async function initDatabase() {
     }
 }
 
-// Charger toutes les données depuis IndexedDB
+// Vérifier si des données existent dans IndexedDB
+async function checkIndexedDBData() {
+    return new Promise((resolve) => {
+        const request = indexedDB.open('TontineDatabase', 1);
+        request.onsuccess = (event) => {
+            const db = event.target.result;
+            if (db.objectStoreNames.contains('members')) {
+                const transaction = db.transaction(['members'], 'readonly');
+                const store = transaction.objectStore('members');
+                const countRequest = store.count();
+                countRequest.onsuccess = () => {
+                    resolve(countRequest.result > 0);
+                };
+            } else {
+                resolve(false);
+            }
+        };
+        request.onerror = () => resolve(false);
+    });
+}
+
+// Charger toutes les données depuis Firestore
 async function loadDataFromDB() {
     try {
-        const [members, tontines, payments] = await Promise.all([
-            tontineDB.loadData('members'),
-            tontineDB.loadData('tontines'),
-            tontineDB.loadData('payments')
+        const { loadCollection } = await import('./firebase-db.js');
+        
+        const [membersResult, tontinesResult, paymentsResult] = await Promise.all([
+            loadCollection('members'),
+            loadCollection('tontines'),
+            loadCollection('payments')
         ]);
         
-        state.members = members || [];
-        state.tontines = tontines || [];
-        state.payments = payments || [];
+        state.members = membersResult.success ? membersResult.data : [];
+        state.tontines = tontinesResult.success ? tontinesResult.data : [];
+        state.payments = paymentsResult.success ? paymentsResult.data : [];
 
-                updateRecentActivities();
-
+        updateRecentActivities();
         
     } catch (error) {
         console.error('Erreur de chargement des données:', error);
@@ -51,29 +98,58 @@ async function loadDataFromDB() {
     }
 }
 
-// Sauvegarder les données dans IndexedDB
-async function saveDataToDB() {
+// Sauvegarder un membre dans Firestore
+async function saveMemberToDB(member) {
     try {
-        await Promise.all([
-            tontineDB.saveData('members', state.members),
-            tontineDB.saveData('tontines', state.tontines),
-            tontineDB.saveData('payments', state.payments)
-        ]);
+        const { saveDocument } = await import('./firebase-db.js');
+        await saveDocument('members', member.id, member);
     } catch (error) {
-        console.error('Erreur de sauvegarde:', error);
-        showNotification('Erreur de sauvegarde des données', 'error');
+        console.error('Erreur de sauvegarde du membre:', error);
+        throw error;
     }
 }
 
-// Load data from localStorage (remplacée par loadDataFromDB)
+// Sauvegarder une tontine dans Firestore
+async function saveTontineToDB(tontine) {
+    try {
+        const { saveDocument } = await import('./firebase-db.js');
+        await saveDocument('tontines', tontine.id, tontine);
+    } catch (error) {
+        console.error('Erreur de sauvegarde de la tontine:', error);
+        throw error;
+    }
+}
+
+// Sauvegarder un paiement dans Firestore
+async function savePaymentToDB(payment) {
+    try {
+        const { saveDocument } = await import('./firebase-db.js');
+        await saveDocument('payments', payment.id, payment);
+    } catch (error) {
+        console.error('Erreur de sauvegarde du paiement:', error);
+        throw error;
+    }
+}
+
+// Supprimer un document de Firestore
+async function deleteFromDB(collection, id) {
+    try {
+        const { deleteDocument } = await import('./firebase-db.js');
+        await deleteDocument(collection, id);
+    } catch (error) {
+        console.error('Erreur de suppression:', error);
+        throw error;
+    }
+}
+
+// Load data from localStorage (obsolète)
 function loadData() {
     // Cette fonction est maintenant gérée par initDatabase()
 }
 
-// Save data to localStorage (remplacée par saveDataToDB)
+// Save data to localStorage (obsolète)
 function saveData() {
-    // Sauvegarder de manière asynchrone
-    saveDataToDB();
+    // Les données sont sauvegardées individuellement dans Firestore
 }
 // Generate unique ID
 function generateId() {
@@ -226,25 +302,70 @@ function initTheme() {
 }
 
 async function initApp() {
-    // Vérifier l'authentification avant d'initialiser l'app
-    if (!checkAuthentication()) {
-        return;
+    try {
+        // Initialiser Firebase
+        const firebaseInitialized = await initFirebase();
+        if (!firebaseInitialized) {
+            showNotification('Impossible de se connecter à Firebase', 'error');
+            return;
+        }
+        
+        // Vérifier l'authentification
+        const { checkAuthState, getCurrentUser } = await import('./firebase-auth.js');
+        
+        checkAuthState(async (user) => {
+            if (user) {
+                // Utilisateur connecté
+                currentUser = user;
+                console.log('Utilisateur connecté:', user.email);
+                
+                // Initialiser la base de données et charger les données
+                await initDatabase();
+                
+                initTheme();
+                setupEventListeners();
+                activateModalDarkMode();
+                updateDashboard();
+                updateRecentActivities();
+                switchSection('dashboard');
+                updateDashboardStats();
+                
+                setTimeout(() => {
+                    initSalesChart();
+                }, 100);
+                
+                // Mettre à jour l'affichage de l'utilisateur
+                const userInfoSpan = document.querySelector('.user-info span');
+                if (userInfoSpan) {
+                    userInfoSpan.textContent = user.email || 'Utilisateur';
+                }
+            } else {
+                // Utilisateur non connecté - rediriger vers la page de connexion
+                window.location.href = 'login.html';
+            }
+        });
+        
+    } catch (error) {
+        console.error('Erreur lors de l\'initialisation:', error);
+        showNotification('Erreur d\'initialisation de l\'application', 'error');
     }
-    
-    // Initialiser la base de données et charger les données
-    await initDatabase();
-    
-    initTheme();
-    setupEventListeners();
-    activateModalDarkMode(); // Activer le mode sombre sur les modales
-    updateDashboard();
-        updateRecentActivities();
+}
 
-    switchSection('dashboard');
-     updateDashboardStats();
-    setTimeout(() => {
-        initSalesChart();
-    }, 100);
+// Fonction de déconnexion
+async function logout() {
+    try {
+        const { logout: firebaseLogout } = await import('./firebase-auth.js');
+        const result = await firebaseLogout();
+        
+        if (result.success) {
+            window.location.href = 'login.html';
+        } else {
+            showNotification('Erreur de déconnexion', 'error');
+        }
+    } catch (error) {
+        console.error('Erreur de déconnexion:', error);
+        showNotification('Erreur de déconnexion', 'error');
+    }
 }
 // Setup event listeners
 function setupEventListeners() {
@@ -540,7 +661,11 @@ function handleMemberSubmit(e) {
         // Update existing member
         const memberIndex = state.members.findIndex(m => m.id === memberId);
         state.members[memberIndex] = { ...state.members[memberIndex], ...memberData };
-        showNotification('Membre modifié avec succès', 'success');
+        saveMemberToDB(state.members[memberIndex]).then(() => {
+            showNotification('Membre modifié avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de sauvegarde', 'error');
+        });
     } else {
         // Add new member
         const newMember = {
@@ -549,15 +674,14 @@ function handleMemberSubmit(e) {
             createdAt: new Date().toISOString()
         };
         state.members.push(newMember);
-        showNotification('Membre ajouté avec succès', 'success');
-         updateRecentActivities();
-    
-    renderMembers();
-    document.getElementById('member-modal').classList.remove('active');
-    document.getElementById('member-form').reset(); 
+        saveMemberToDB(newMember).then(() => {
+            showNotification('Membre ajouté avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de sauvegarde', 'error');
+        });
+        updateRecentActivities();
     }
     
-    saveData();
     closeModal('member-modal');
     
     if (state.currentSection === 'members') {
@@ -834,8 +958,13 @@ function deleteMember(memberId) {
             }
         });
         
-        saveData();
-        showNotification('Membre supprimé avec succès', 'success');
+        // Supprimer de Firestore
+        deleteFromDB('members', memberId).then(() => {
+            showNotification('Membre supprimé avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de suppression', 'error');
+        });
+        
         renderMembers();
         updateDashboard();
     }
@@ -1187,7 +1316,11 @@ function handleTontineSubmit(e) {
         // Update existing tontine
         const tontineIndex = state.tontines.findIndex(t => t.id === tontineId);
         state.tontines[tontineIndex] = { ...state.tontines[tontineIndex], ...tontineData };
-        showNotification('Tontine modifiée avec succès', 'success');
+        saveTontineToDB(state.tontines[tontineIndex]).then(() => {
+            showNotification('Tontine modifiée avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de sauvegarde', 'error');
+        });
     } else {
         // Add new tontine
         const newTontine = {
@@ -1197,15 +1330,14 @@ function handleTontineSubmit(e) {
             createdAt: new Date().toISOString()
         };
         state.tontines.push(newTontine);
-        showNotification('Tontine créée avec succès', 'success');
+        saveTontineToDB(newTontine).then(() => {
+            showNotification('Tontine créée avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de sauvegarde', 'error');
+        });
         updateRecentActivities();
-    
-    renderTontines();
-    document.getElementById('tontine-modal').classList.remove('active');
-    document.getElementById('tontine-form').reset();
     }
     
-    saveData();
     closeModal('tontine-modal');
     
     if (state.currentSection === 'tontines') {
@@ -1530,8 +1662,11 @@ function deleteTontine(tontineId) {
     
     if (confirm(`Êtes-vous sûr de vouloir supprimer la tontine "${tontine.name}" ?`)) {
         state.tontines = state.tontines.filter(t => t.id !== tontineId);
-        saveData();
-        showNotification('Tontine supprimée avec succès', 'success');
+        deleteFromDB('tontines', tontineId).then(() => {
+            showNotification('Tontine supprimée avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de suppression', 'error');
+        });
         renderTontines();
         updateDashboard();
     }
@@ -1886,7 +2021,11 @@ function handlePaymentSubmit(e) {
         // Update existing payment
         const paymentIndex = state.payments.findIndex(p => p.id === paymentId);
         state.payments[paymentIndex] = { ...state.payments[paymentIndex], ...paymentData };
-        showNotification('Paiement modifié avec succès', 'success');
+        savePaymentToDB(state.payments[paymentIndex]).then(() => {
+            showNotification('Paiement modifié avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de sauvegarde', 'error');
+        });
     } else {
         // Add new payment
         const newPayment = {
@@ -1896,13 +2035,12 @@ function handlePaymentSubmit(e) {
             createdAt: new Date().toISOString()
         };
         state.payments.push(newPayment);
-        showNotification('Paiement enregistré avec succès', 'success');
-          updateRecentActivities();
-    
-    renderPayments();
-    updatePaymentsSummary();
-    document.getElementById('payment-modal').classList.remove('active');
-    document.getElementById('payment-form').reset();
+        savePaymentToDB(newPayment).then(() => {
+            showNotification('Paiement enregistré avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de sauvegarde', 'error');
+        });
+        updateRecentActivities();
         
         // Check if round is complete and advance to next round for contributions
         if (paymentData.type === 'contribution') {
@@ -1913,7 +2051,6 @@ function handlePaymentSubmit(e) {
         checkTontineCompletion(paymentData.tontineId);
     }
     
-    saveData();
     closeModal('payment-modal');
     
     if (state.currentSection === 'payments') {
@@ -2222,8 +2359,11 @@ function deletePayment(paymentId) {
     
     if (confirm('Êtes-vous sûr de vouloir supprimer ce paiement ?')) {
         state.payments = state.payments.filter(p => p.id !== paymentId);
-        saveData();
-        showNotification('Paiement supprimé avec succès', 'success');
+        deleteFromDB('payments', paymentId).then(() => {
+            showNotification('Paiement supprimé avec succès', 'success');
+        }).catch((error) => {
+            showNotification('Erreur de suppression', 'error');
+        });
         renderPayments();
         updatePaymentsSummary();
         updateDashboard();
@@ -3323,8 +3463,9 @@ window.addEventListener('error', function(event) {
 });
 
 // Sauvegarder automatiquement avant de fermer la page
+// Les données sont maintenant sauvegardées automatiquement dans Firestore
 window.addEventListener('beforeunload', function() {
-    saveDataToDB();
+    // Plus besoin de sauvegarder manuellement avec Firebase
 });
 // Chart.js configuration pour le graphique
 function initSalesChart() {
