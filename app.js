@@ -315,6 +315,13 @@ async function initApp() {
         
         checkAuthState(async (user) => {
             if (user) {
+                // Recharger les données utilisateur pour obtenir le displayName
+                try {
+                    await user.reload();
+                } catch (reloadError) {
+                    console.log('Erreur lors du rechargement des données utilisateur:', reloadError);
+                }
+                
                 // Utilisateur connecté
                 currentUser = user;
                 console.log('Utilisateur connecté:', user.email);
@@ -362,12 +369,8 @@ function updateUserDisplay(user) {
         console.log('Mise à jour du nom d\'utilisateur:', user);
         if (user.displayName) {
             displayName = user.displayName;
-        } else if (user.email) {
-            const emailName = user.email.split('@')[0];
-            displayName = emailName
-                .split(/[._-]/)
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                .join(' ');
+        } else {
+            displayName = 'Utilisateur';
         }
         
         userNameSpan.textContent = displayName;
@@ -2522,16 +2525,8 @@ async function printPaymentReceipt(paymentId) {
     const currentUser = getCurrentUser();
     
     let managerName = 'Gestionnaire';
-    if (currentUser) {
-        if (currentUser.displayName) {
-            managerName = currentUser.displayName;
-        } else if (currentUser.email) {
-            const emailName = currentUser.email.split('@')[0];
-            managerName = emailName
-                .split(/[._-]/)
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                .join(' ');
-        }
+    if (currentUser && currentUser.displayName) {
+        managerName = currentUser.displayName;
     }
     
     const receiptContent = `
@@ -2553,16 +2548,16 @@ async function printPaymentReceipt(paymentId) {
                     font-family: 'Inter', 'Segoe UI', sans-serif;
                     max-width: 600px;
                     margin: 0 auto;
-                    padding: 40px 30px;
-                    line-height: 1.6;
+                    padding: 20px 15px;
+                    line-height: 1.4;
                     color: #1f2937;
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 }
                 
                 .receipt-container {
                     background: white;
-                    border-radius: 20px;
-                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                    border-radius: 12px;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
                     overflow: hidden;
                 }
                 
@@ -2570,74 +2565,81 @@ async function printPaymentReceipt(paymentId) {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
                     text-align: center;
-                    padding: 40px 30px;
+                    padding: 20px 20px;
                 }
                 
                 .logo {
-                    font-size: 48px;
-                    margin-bottom: 15px;
+                    max-width: 60px;
+                    height: 60px;
+                    margin: 0 auto 10px;
+                }
+                
+                .logo img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
                 }
                 
                 .title {
-                    font-size: 32px;
+                    font-size: 24px;
                     font-weight: 700;
-                    margin-bottom: 8px;
-                    letter-spacing: 1px;
+                    margin-bottom: 5px;
+                    letter-spacing: 0.5px;
                 }
                 .subtitle {
-                    font-size: 16px;
+                    font-size: 14px;
                     opacity: 0.95;
                     font-weight: 500;
                 }
                 
                 .content {
-                    padding: 40px 35px;
+                    padding: 20px 25px;
                 }
                 
                 .ref-number {
                     text-align: center;
                     background: #f3f4f6;
-                    padding: 15px;
-                    border-radius: 12px;
-                    margin-bottom: 30px;
+                    padding: 10px;
+                    border-radius: 8px;
+                    margin-bottom: 15px;
                 }
                 
                 .ref-number .label {
-                    font-size: 13px;
+                    font-size: 11px;
                     color: #6b7280;
                     font-weight: 600;
                     text-transform: uppercase;
-                    letter-spacing: 0.5px;
+                    letter-spacing: 0.3px;
                 }
                 
                 .ref-number .value {
-                    font-size: 22px;
+                    font-size: 16px;
                     color: #667eea;
                     font-weight: 700;
-                    margin-top: 5px;
+                    margin-top: 3px;
                 }
                 
                 .receipt-info {
                     background: #f9fafb;
-                    padding: 25px;
-                    border-radius: 12px;
-                    margin-bottom: 25px;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-bottom: 15px;
                     border: 1px solid #e5e7eb;
                 }
                 
                 .section-title {
-                    font-size: 14px;
+                    font-size: 12px;
                     font-weight: 700;
                     color: #374151;
-                    margin-bottom: 15px;
+                    margin-bottom: 10px;
                     text-transform: uppercase;
-                    letter-spacing: 0.5px;
+                    letter-spacing: 0.3px;
                 }
                 
                 .info-row {
                     display: flex;
                     justify-content: space-between;
-                    padding: 12px 0;
+                    padding: 8px 0;
                     border-bottom: 1px dashed #e5e7eb;
                 }
                 
@@ -2648,61 +2650,62 @@ async function printPaymentReceipt(paymentId) {
                 .label {
                     font-weight: 600;
                     color: #6b7280;
-                    font-size: 14px;
+                    font-size: 12px;
                 }
                 
                 .value {
                     color: #111827;
                     font-weight: 600;
-                    font-size: 14px;
+                    font-size: 12px;
                 }
                 
                 .amount-box {
                     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                     color: white;
                     text-align: center;
-                    padding: 25px;
-                    border-radius: 12px;
-                    margin: 30px 0;
-                    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin: 15px 0;
+                    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
                 }
                 
                 .amount-box .amount-label {
-                    font-size: 14px;
+                    font-size: 12px;
                     opacity: 0.9;
-                    margin-bottom: 8px;
+                    margin-bottom: 5px;
                     font-weight: 600;
                 }
                 
                 .amount-box .amount-value {
-                    font-size: 36px;
+                    font-size: 28px;
                     font-weight: 700;
                 }
                 
                 .notes-section {
                     background: #fffbeb;
-                    border-left: 4px solid #f59e0b;
-                    padding: 20px;
-                    border-radius: 8px;
-                    margin: 20px 0;
+                    border-left: 3px solid #f59e0b;
+                    padding: 12px;
+                    border-radius: 6px;
+                    margin: 12px 0;
                 }
                 
                 .notes-section .label {
                     color: #92400e;
-                    margin-bottom: 10px;
+                    margin-bottom: 6px;
+                    font-size: 11px;
                 }
                 
                 .notes-content {
                     color: #78350f;
-                    font-size: 14px;
-                    line-height: 1.6;
+                    font-size: 11px;
+                    line-height: 1.4;
                 }
                 
                 .signature-section {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
-                    gap: 30px;
-                    margin-top: 50px;
+                    gap: 20px;
+                    margin-top: 25px;
                 }
                 
                 .signature-box {
@@ -2710,57 +2713,54 @@ async function printPaymentReceipt(paymentId) {
                 }
                 
                 .signature-line {
-                    border-bottom: 2px solid #1f2937;
+                    border-bottom: 1px solid #1f2937;
                     width: 100%;
-                    margin: 40px 0 10px 0;
+                    margin: 25px 0 8px 0;
                 }
                 
                 .signature-label {
-                    font-size: 13px;
+                    font-size: 11px;
                     color: #6b7280;
                     font-weight: 600;
                 }
                 
                 .footer {
                     text-align: center;
-                    margin-top: 40px;
-                    padding-top: 25px;
-                    border-top: 2px solid #e5e7eb;
-                    font-size: 12px;
+                    margin-top: 20px;
+                    padding-top: 15px;
+                    border-top: 1px solid #e5e7eb;
+                    font-size: 10px;
                     color: #9ca3af;
                 }
                 
                 .footer p {
-                    margin: 5px 0;
-                }
-                
-                .stamp-box {
-                    margin-top: 20px;
-                    padding: 15px;
-                    border: 2px dashed #d1d5db;
-                    border-radius: 8px;
-                    text-align: center;
-                    color: #9ca3af;
-                    font-size: 11px;
+                    margin: 3px 0;
                 }
                 
                 @media print {
                     body { 
                         margin: 0; 
-                        padding: 10px; 
+                        padding: 0; 
                         background: white;
                     }
                     .receipt-container {
                         box-shadow: none;
+                        border-radius: 0;
                     }
                     .no-print { display: none; }
+                    @page { 
+                        margin: 10mm; 
+                        size: A4 portrait;
+                    }
                 }
             </style>
         </head>
         <body>
             <div class="receipt-container">
                 <div class="header">
-                    <div class="logo">💰</div>
+                    <div class="logo">
+                        <img src="logo tontine.png" alt="Logo" onerror="this.style.display='none'">
+                    </div>
                     <h1 class="title">REÇU DE PAIEMENT</h1>
                     <p class="subtitle">Gestionnaire de Tontines</p>
                 </div>
@@ -2832,18 +2832,13 @@ async function printPaymentReceipt(paymentId) {
                         </div>
                         <div class="signature-box">
                             <div class="signature-line"></div>
-                            <div class="signature-label">Signature du Gestionnaire<br/>${managerName}</div>
+                            <div class="signature-label">Gestionnaire<br/>${managerName}</div>
                         </div>
                     </div>
                     
-                    <div class="stamp-box">
-                        CACHET DE LA TONTINE
-                    </div>
-                    
                     <div class="footer">
-                        <p><strong>Reçu généré le:</strong> ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
-                        <p>Gestionnaire de Tontines - Système de Gestion Professionnel</p>
-                        <p style="margin-top: 10px; font-size: 10px;">Ce reçu fait foi de paiement et doit être conservé précieusement.</p>
+                        <p><strong>Généré le:</strong> ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
+                        <p>Ce document atteste du paiement effectué et doit être conservé.</p>
                     </div>
                 </div>
             </div>
