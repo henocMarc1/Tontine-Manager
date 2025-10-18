@@ -254,6 +254,11 @@
                         </label>
                         <input type="password" id="login-password" placeholder="Votre mot de passe" required>
                     </div>
+                    <div style="text-align: right; margin-bottom: 15px;">
+                        <a href="#" onclick="handleForgotPassword(event)" style="color: #667eea; text-decoration: none; font-size: 14px;">
+                            Mot de passe oublié ?
+                        </a>
+                    </div>
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-sign-in-alt"></i> Se connecter
                     </button>
@@ -408,6 +413,37 @@
                 window.location.href = 'index.html';
             } else {
                 showError(result.error || 'Erreur de connexion avec Google');
+            }
+        };
+
+        // Gérer le mot de passe oublié
+        window.handleForgotPassword = async function(event) {
+            event.preventDefault();
+            
+            if (!authInitialized) {
+                showError('Firebase n\'est pas encore initialisé. Veuillez patienter.');
+                return;
+            }
+
+            const email = document.getElementById('login-email').value;
+            
+            if (!email) {
+                showError('Veuillez entrer votre adresse email');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+
+            const { resetPassword } = await import('./firebase-auth.js');
+            const result = await resetPassword(email);
+
+            showLoading(false);
+
+            if (result.success) {
+                alert('Un email de réinitialisation a été envoyé à ' + email);
+            } else {
+                showError(result.error || 'Erreur lors de l\'envoi de l\'email');
             }
         };
 
