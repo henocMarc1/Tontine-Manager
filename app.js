@@ -351,29 +351,31 @@ async function initApp() {
 // Mettre à jour l'affichage de l'utilisateur connecté
 function updateUserDisplay(user) {
     const userNameSpan = document.getElementById('current-user-name');
-    if (!userNameSpan) return;
+    if (!userNameSpan) {
+        console.log('Element current-user-name non trouvé');
+        return;
+    }
     
     let displayName = 'Utilisateur';
     
     if (user) {
+        console.log('Mise à jour du nom d\'utilisateur:', user);
         if (user.displayName) {
             displayName = user.displayName;
         } else if (user.email) {
-            // Extraire le nom depuis l'email (partie avant @)
             const emailName = user.email.split('@')[0];
-            // Capitaliser la première lettre de chaque mot
             displayName = emailName
                 .split(/[._-]/)
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                 .join(' ');
         }
-    }
-    
-    userNameSpan.textContent = displayName;
-    
-    // Ajouter aussi une infobulle avec l'email complet
-    if (user && user.email) {
+        
+        userNameSpan.textContent = displayName;
         userNameSpan.title = `Connecté en tant que: ${user.email}`;
+        console.log('Nom d\'utilisateur mis à jour:', displayName);
+    } else {
+        console.log('Aucun utilisateur fourni à updateUserDisplay');
+        userNameSpan.textContent = 'Utilisateur';
     }
 }
 
@@ -485,6 +487,9 @@ function switchSection(sectionName) {
             renderPayments();
             updatePaymentsSummary();
             updatePaymentFilters();
+            break;
+        case 'settings':
+            initializeSettingsSection();
             break;
     }
 }
@@ -2506,12 +2511,28 @@ function closeModal(modalId) {
 }
 
 // Fonction pour imprimer un reçu de paiement
-function printPaymentReceipt(paymentId) {
+async function printPaymentReceipt(paymentId) {
     const payment = state.payments.find(p => p.id === paymentId);
     if (!payment) return;
 
     const member = getMemberName(payment.memberId);
     const tontine = state.tontines.find(t => t.id === payment.tontineId);
+    
+    const { getCurrentUser } = await import('./firebase-auth.js');
+    const currentUser = getCurrentUser();
+    
+    let managerName = 'Gestionnaire';
+    if (currentUser) {
+        if (currentUser.displayName) {
+            managerName = currentUser.displayName;
+        } else if (currentUser.email) {
+            const emailName = currentUser.email.split('@')[0];
+            managerName = emailName
+                .split(/[._-]/)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+        }
+    }
     
     const receiptContent = `
         <!DOCTYPE html>
@@ -2520,152 +2541,311 @@ function printPaymentReceipt(paymentId) {
             <meta charset="UTF-8">
             <title>Reçu de Paiement - ${payment.reference}</title>
             <style>
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    max-width: 400px;
-                    margin: 0 auto;
-                    padding: 20px;
-                    line-height: 1.6;
-                    color: #333;
-                }
-                .header {
-                    text-align: center;
-                    border-bottom: 2px solid #6366f1;
-                    padding-bottom: 15px;
-                    margin-bottom: 20px;
-                }
-                .title {
-                    font-size: 24px;
-                    font-weight: bold;
-                    color: #6366f1;
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+                
+                * {
                     margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                
+                body {
+                    font-family: 'Inter', 'Segoe UI', sans-serif;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 40px 30px;
+                    line-height: 1.6;
+                    color: #1f2937;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                }
+                
+                .receipt-container {
+                    background: white;
+                    border-radius: 20px;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                    overflow: hidden;
+                }
+                
+                .header {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    text-align: center;
+                    padding: 40px 30px;
+                }
+                
+                .logo {
+                    font-size: 48px;
+                    margin-bottom: 15px;
+                }
+                
+                .title {
+                    font-size: 32px;
+                    font-weight: 700;
+                    margin-bottom: 8px;
+                    letter-spacing: 1px;
                 }
                 .subtitle {
-                    font-size: 14px;
-                    color: #666;
-                    margin: 5px 0;
+                    font-size: 16px;
+                    opacity: 0.95;
+                    font-weight: 500;
                 }
-                .receipt-info {
-                    background: #f8fafc;
+                
+                .content {
+                    padding: 40px 35px;
+                }
+                
+                .ref-number {
+                    text-align: center;
+                    background: #f3f4f6;
                     padding: 15px;
-                    border-radius: 8px;
-                    margin: 20px 0;
+                    border-radius: 12px;
+                    margin-bottom: 30px;
                 }
+                
+                .ref-number .label {
+                    font-size: 13px;
+                    color: #6b7280;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                
+                .ref-number .value {
+                    font-size: 22px;
+                    color: #667eea;
+                    font-weight: 700;
+                    margin-top: 5px;
+                }
+                
+                .receipt-info {
+                    background: #f9fafb;
+                    padding: 25px;
+                    border-radius: 12px;
+                    margin-bottom: 25px;
+                    border: 1px solid #e5e7eb;
+                }
+                
+                .section-title {
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #374151;
+                    margin-bottom: 15px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                
                 .info-row {
                     display: flex;
                     justify-content: space-between;
-                    margin: 8px 0;
-                    padding: 5px 0;
+                    padding: 12px 0;
+                    border-bottom: 1px dashed #e5e7eb;
                 }
-                .info-row:not(:last-child) {
-                    border-bottom: 1px dotted #ddd;
+                
+                .info-row:last-child {
+                    border-bottom: none;
                 }
+                
                 .label {
                     font-weight: 600;
-                    color: #374151;
+                    color: #6b7280;
+                    font-size: 14px;
                 }
+                
                 .value {
                     color: #111827;
+                    font-weight: 600;
+                    font-size: 14px;
                 }
-                .amount {
-                    font-size: 20px;
-                    font-weight: bold;
-                    color: #059669;
+                
+                .amount-box {
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    color: white;
                     text-align: center;
-                    background: #ecfdf5;
-                    padding: 10px;
-                    border-radius: 6px;
-                    margin: 15px 0;
+                    padding: 25px;
+                    border-radius: 12px;
+                    margin: 30px 0;
+                    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
                 }
+                
+                .amount-box .amount-label {
+                    font-size: 14px;
+                    opacity: 0.9;
+                    margin-bottom: 8px;
+                    font-weight: 600;
+                }
+                
+                .amount-box .amount-value {
+                    font-size: 36px;
+                    font-weight: 700;
+                }
+                
+                .notes-section {
+                    background: #fffbeb;
+                    border-left: 4px solid #f59e0b;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                }
+                
+                .notes-section .label {
+                    color: #92400e;
+                    margin-bottom: 10px;
+                }
+                
+                .notes-content {
+                    color: #78350f;
+                    font-size: 14px;
+                    line-height: 1.6;
+                }
+                
+                .signature-section {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 30px;
+                    margin-top: 50px;
+                }
+                
+                .signature-box {
+                    text-align: center;
+                }
+                
+                .signature-line {
+                    border-bottom: 2px solid #1f2937;
+                    width: 100%;
+                    margin: 40px 0 10px 0;
+                }
+                
+                .signature-label {
+                    font-size: 13px;
+                    color: #6b7280;
+                    font-weight: 600;
+                }
+                
                 .footer {
                     text-align: center;
-                    margin-top: 30px;
-                    padding-top: 15px;
-                    border-top: 1px solid #ddd;
-                    font-size: 12px;
-                    color: #666;
-                }
-                .signature {
                     margin-top: 40px;
-                    text-align: right;
+                    padding-top: 25px;
+                    border-top: 2px solid #e5e7eb;
+                    font-size: 12px;
+                    color: #9ca3af;
                 }
-                .signature-line {
-                    border-bottom: 1px solid #333;
-                    width: 200px;
-                    margin: 20px 0 5px auto;
+                
+                .footer p {
+                    margin: 5px 0;
                 }
+                
+                .stamp-box {
+                    margin-top: 20px;
+                    padding: 15px;
+                    border: 2px dashed #d1d5db;
+                    border-radius: 8px;
+                    text-align: center;
+                    color: #9ca3af;
+                    font-size: 11px;
+                }
+                
                 @media print {
-                    body { margin: 0; padding: 10px; }
+                    body { 
+                        margin: 0; 
+                        padding: 10px; 
+                        background: white;
+                    }
+                    .receipt-container {
+                        box-shadow: none;
+                    }
                     .no-print { display: none; }
                 }
             </style>
         </head>
         <body>
-            <div class="header">
-                <h1 class="title">REÇU DE PAIEMENT</h1>
-                <p class="subtitle">Gestionnaire de Tontines</p>
-            </div>
-            
-            <div class="receipt-info">
-                <div class="info-row">
-                    <span class="label">Numéro de Reçu:</span>
-                    <span class="value">${payment.reference}</span>
+            <div class="receipt-container">
+                <div class="header">
+                    <div class="logo">💰</div>
+                    <h1 class="title">REÇU DE PAIEMENT</h1>
+                    <p class="subtitle">Gestionnaire de Tontines</p>
                 </div>
-                <div class="info-row">
-                    <span class="label">Date de Paiement:</span>
-                    <span class="value">${new Date(payment.date).toLocaleDateString('fr-FR')}</span>
+                
+                <div class="content">
+                    <div class="ref-number">
+                        <div class="label">Numéro de Reçu</div>
+                        <div class="value">${payment.reference}</div>
+                    </div>
+                    
+                    <div class="receipt-info">
+                        <div class="section-title">Informations du Paiement</div>
+                        <div class="info-row">
+                            <span class="label">Date de Paiement</span>
+                            <span class="value">${new Date(payment.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Membre</span>
+                            <span class="value">${member}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Tontine</span>
+                            <span class="value">${tontine ? tontine.name : 'N/A'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Tour N°</span>
+                            <span class="value">${payment.round}${tontine ? ' / ' + tontine.totalRounds : ''}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="receipt-info">
+                        <div class="section-title">Détails de la Transaction</div>
+                        <div class="info-row">
+                            <span class="label">Type de Paiement</span>
+                            <span class="value">${getPaymentTypeText(payment.type)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Méthode de Paiement</span>
+                            <span class="value">${getPaymentMethodText(payment.method)}</span>
+                        </div>
+                        ${payment.penalty > 0 ? `
+                        <div class="info-row">
+                            <span class="label">Pénalité de Retard</span>
+                            <span class="value" style="color: #dc2626;">${formatCurrency(payment.penalty)} FCFA</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Jours de Retard</span>
+                            <span class="value" style="color: #dc2626;">${payment.daysLate || 0} jour(s)</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="amount-box">
+                        <div class="amount-label">MONTANT TOTAL</div>
+                        <div class="amount-value">${formatCurrency(payment.amount)} FCFA</div>
+                    </div>
+                    
+                    ${payment.notes ? `
+                    <div class="notes-section">
+                        <div class="label">📝 Notes</div>
+                        <div class="notes-content">${payment.notes}</div>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="signature-section">
+                        <div class="signature-box">
+                            <div class="signature-line"></div>
+                            <div class="signature-label">Signature du Membre</div>
+                        </div>
+                        <div class="signature-box">
+                            <div class="signature-line"></div>
+                            <div class="signature-label">Signature du Gestionnaire<br/>${managerName}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stamp-box">
+                        CACHET DE LA TONTINE
+                    </div>
+                    
+                    <div class="footer">
+                        <p><strong>Reçu généré le:</strong> ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
+                        <p>Gestionnaire de Tontines - Système de Gestion Professionnel</p>
+                        <p style="margin-top: 10px; font-size: 10px;">Ce reçu fait foi de paiement et doit être conservé précieusement.</p>
+                    </div>
                 </div>
-                <div class="info-row">
-                    <span class="label">Membre:</span>
-                    <span class="value">${member}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">Tontine:</span>
-                    <span class="value">${tontine ? tontine.name : 'N/A'}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">Tour:</span>
-                    <span class="value">${payment.round}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">Type de Paiement:</span>
-                    <span class="value">${getPaymentTypeText(payment.type)}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">Méthode:</span>
-                    <span class="value">${getPaymentMethodText(payment.method)}</span>
-                </div>
-                ${payment.penalty > 0 ? `
-                <div class="info-row">
-                    <span class="label">Pénalité:</span>
-                    <span class="value">${formatCurrency(payment.penalty)}</span>
-                </div>
-                ` : ''}
-            </div>
-            
-            <div class="amount">
-                Montant Total: ${formatCurrency(payment.amount)}
-            </div>
-            
-            ${payment.notes ? `
-            <div class="receipt-info">
-                <div class="info-row">
-                    <span class="label">Notes:</span>
-                </div>
-                <div style="margin-top: 8px; padding: 8px; background: #fff; border-radius: 4px;">
-                    ${payment.notes}
-                </div>
-            </div>
-            ` : ''}
-            
-            <div class="signature">
-                <div class="signature-line"></div>
-                <p>Signature du Trésorier</p>
-            </div>
-            
-            <div class="footer">
-                <p>Reçu généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
-                <p>Gestionnaire de Tontines - Système de Gestion</p>
             </div>
         </body>
         </html>
@@ -3735,3 +3915,113 @@ function refreshAllViews() {
         updatePaymentsSummary();
     }
 }
+
+// ==================== SETTINGS FUNCTIONS ====================
+
+// Load and display user settings
+async function loadUserSettings() {
+    try {
+        const { getCurrentUser } = await import('./firebase-auth.js');
+        const user = getCurrentUser();
+        
+        if (!user) {
+            console.log('No user found for settings');
+            return;
+        }
+        
+        // Display user information
+        document.getElementById('user-email').textContent = user.email || 'Non défini';
+        
+        // Creation date
+        const createdDate = user.metadata.creationTime 
+            ? new Date(user.metadata.creationTime).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+            : 'Non disponible';
+        document.getElementById('user-created-date').textContent = createdDate;
+        
+        // Last login
+        const lastLogin = user.metadata.lastSignInTime 
+            ? new Date(user.metadata.lastSignInTime).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+            : 'Non disponible';
+        document.getElementById('user-last-login').textContent = lastLogin;
+        
+        // User ID
+        document.getElementById('user-uid').textContent = user.uid || 'Non disponible';
+        
+        // Display statistics
+        updateUserStatistics();
+        
+    } catch (error) {
+        console.error('Error loading user settings:', error);
+    }
+}
+
+// Update user statistics
+function updateUserStatistics() {
+    document.getElementById('stats-members-count').textContent = state.members.length;
+    document.getElementById('stats-tontines-count').textContent = state.tontines.length;
+    document.getElementById('stats-payments-count').textContent = state.payments.length;
+    
+    const totalAmount = state.payments.reduce((sum, payment) => sum + payment.amount, 0);
+    document.getElementById('stats-total-amount').textContent = formatCurrency(totalAmount) + ' FCFA';
+}
+
+// Handle password change
+async function handlePasswordChange(event) {
+    event.preventDefault();
+    
+    const currentPassword = document.getElementById('current-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+        showNotification('Les mots de passe ne correspondent pas', 'error');
+        return;
+    }
+    
+    // Validate password length
+    if (newPassword.length < 6) {
+        showNotification('Le mot de passe doit contenir au moins 6 caractères', 'error');
+        return;
+    }
+    
+    try {
+        const { changePassword } = await import('./firebase-auth.js');
+        const result = await changePassword(currentPassword, newPassword);
+        
+        if (result.success) {
+            showNotification('Mot de passe modifié avec succès', 'success');
+            document.getElementById('change-password-form').reset();
+        } else {
+            showNotification(result.error || 'Erreur lors du changement de mot de passe', 'error');
+        }
+    } catch (error) {
+        console.error('Error changing password:', error);
+        showNotification('Erreur lors du changement de mot de passe', 'error');
+    }
+}
+
+// Initialize settings section when it becomes active
+function initializeSettingsSection() {
+    loadUserSettings();
+    
+    // Add event listener for password change form
+    const passwordForm = document.getElementById('change-password-form');
+    if (passwordForm && !passwordForm.dataset.listenerAdded) {
+        passwordForm.addEventListener('submit', handlePasswordChange);
+        passwordForm.dataset.listenerAdded = 'true';
+    }
+}
+
