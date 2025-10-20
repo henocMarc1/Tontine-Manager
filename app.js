@@ -338,7 +338,7 @@ async function initApp() {
                 updateDashboardStats();
                 
                 setTimeout(() => {
-                    initSalesChart();
+                    initPaymentsChart();
                 }, 100);
                 
                 // Mettre à jour l'affichage de l'utilisateur
@@ -2326,19 +2326,19 @@ function renderPayments(searchTerm = '') {
                 
                 return `
                     <div class="table-row">
-                        <div class="table-cell">${new Date(payment.date).toLocaleDateString('fr-FR')}</div>
-                        <div class="table-cell">${payment.reference}</div>
-                        <div class="table-cell">${member ? member.name : 'Membre inconnu'}</div>
-                        <div class="table-cell">${tontine ? tontine.name : 'Tontine inconnue'}</div>
-                        <div class="table-cell amount">
+                        <div class="table-cell" data-label="Date">${new Date(payment.date).toLocaleDateString('fr-FR')}</div>
+                        <div class="table-cell" data-label="Référence">${payment.reference}</div>
+                        <div class="table-cell" data-label="Membre">${member ? member.name : 'Membre inconnu'}</div>
+                        <div class="table-cell" data-label="Tontine">${tontine ? tontine.name : 'Tontine inconnue'}</div>
+                        <div class="table-cell amount" data-label="Montant">
                             ${formatCurrency(payment.amount)} FCFA
                             ${payment.penalty ? `<br><small style="color: #f59e0b; font-weight: 500;"><i class="fas fa-exclamation-triangle"></i> +${formatCurrency(payment.penalty)} FCFA (pénalité)</small>` : ''}
                         </div>
-                        <div class="table-cell">
+                        <div class="table-cell" data-label="Type">
                             <span class="type-badge ${payment.type}">${getPaymentTypeText(payment.type)}</span>
                         </div>
-                        <div class="table-cell">${getPaymentMethodText(payment.method)}</div>
-                        <div class="table-cell actions">
+                        <div class="table-cell" data-label="Mode">${getPaymentMethodText(payment.method)}</div>
+                        <div class="table-cell actions" data-label="Actions">
                             <button class="btn btn-sm btn-primary" onclick="printPaymentReceipt('${payment.id}')" title="Imprimer le reçu">
                                 <i class="fas fa-print"></i>
                             </button>
