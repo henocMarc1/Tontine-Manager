@@ -1859,16 +1859,13 @@ function updateAvailableRounds() {
         }
     }
     
-    // Check if all regular rounds are completed and allow additional payments
-    const allRegularRoundsCompleted = paidRounds.filter(r => r <= tontine.totalRounds).length === tontine.totalRounds;
-    if (allRegularRoundsCompleted || tontine.allowAdditionalPayments) {
-        // Add option for additional payments (cagnotte rapportée)
-        const nextRound = Math.max(...paidRounds, tontine.totalRounds) + 1;
+    // Afficher un message si tous les tours sont payés
+    const allRoundsPaid = paidRounds.filter(r => r <= tontine.totalRounds).length === tontine.totalRounds;
+    if (allRoundsPaid) {
         const option = document.createElement('option');
-        option.value = nextRound;
-        option.textContent = `Tour ${nextRound} (Cagnotte rapportée)`;
-        option.style.fontStyle = 'italic';
-        option.style.color = '#666';
+        option.value = '';
+        option.textContent = 'Tous les tours sont déjà payés';
+        option.disabled = true;
         roundSelect.appendChild(option);
     }
     
@@ -1992,6 +1989,12 @@ function handlePaymentSubmit(e) {
     const tontine = state.tontines.find(t => t.id === paymentData.tontineId);
     if (!tontine) {
         showNotification('Tontine non trouvée', 'error');
+        return;
+    }
+    
+    // Vérifier que le tour ne dépasse pas le nombre total de tours de la tontine
+    if (paymentData.round > tontine.totalRounds) {
+        showNotification(`Cette tontine n'a que ${tontine.totalRounds} tour(s). Vous ne pouvez pas payer pour le tour ${paymentData.round}.`, 'error');
         return;
     }
     
