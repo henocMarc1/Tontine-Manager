@@ -1,14 +1,19 @@
 // Firebase Configuration
 // Les clés sont chargées depuis les variables d'environnement pour la sécurité
 
-const firebaseConfig = {
-    apiKey: "AIzaSyCZej9YltyxigiDKtmP4JK6bWMxzdZ-L6I",
-    authDomain: "tontine-manager-4ca6a.firebaseapp.com",
-    projectId: "tontine-manager-4ca6a",
-    storageBucket: "tontine-manager-4ca6a.firebasestorage.app",
-    messagingSenderId: "301277281975",
-    appId: "1:301277281975:web:45081924cae58078c01732",
-    measurementId: "G-9ZJYTBME2Z"
-};
+// Fonction pour charger la configuration Firebase depuis le serveur
+async function loadFirebaseConfig() {
+    try {
+        const response = await fetch('/api/firebase-config');
+        if (!response.ok) {
+            throw new Error('Impossible de charger la configuration Firebase');
+        }
+        const config = await response.json();
+        return config;
+    } catch (error) {
+        console.error('Erreur lors du chargement de la configuration Firebase:', error);
+        throw error;
+    }
+}
 
-export { firebaseConfig };
+export { loadFirebaseConfig };
