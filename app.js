@@ -466,6 +466,15 @@ function setupEventListeners() {
             renderPayments(searchTerm);
         });
     }
+    
+    // Validation du champ téléphone - uniquement des chiffres
+    const phoneInput = document.getElementById('member-phone');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', (e) => {
+            // Supprimer tous les caractères non numériques
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+        });
+    }
 }
 
 // Switch between sections
@@ -981,25 +990,25 @@ function deleteMember(memberId) {
         return;
     }
     
-    // Check if member is in any active tontine
-    const memberTontines = state.tontines.filter(t => 
-        t.members && t.members.includes(memberId) && t.status === 'active'
-    );
+    // Vérifier si le membre participe à une tontine (active ou non)
+    const memberTontines = state.tontines.filter(t => {
+        // Vérifier dans members
+        const inMembers = t.members && t.members.includes(memberId);
+        // Vérifier dans membersWithPositions
+        const inMembersWithPositions = t.membersWithPositions && 
+            t.membersWithPositions.some(mp => mp.memberId === memberId);
+        
+        return inMembers || inMembersWithPositions;
+    });
     
     if (memberTontines.length > 0) {
-        showNotification('Impossible de supprimer ce membre car il participe à des tontines actives', 'error');
+        const tontineNames = memberTontines.map(t => t.name).join(', ');
+        showNotification(`Impossible de supprimer ce membre car il participe à ${memberTontines.length} tontine(s): ${tontineNames}`, 'error');
         return;
     }
     
     if (confirm(`Êtes-vous sûr de vouloir supprimer ${member.name} ?`)) {
         state.members = state.members.filter(m => m.id !== memberId);
-        
-        // Remove member from tontines
-        state.tontines.forEach(tontine => {
-            if (tontine.members) {
-                tontine.members = tontine.members.filter(id => id !== memberId);
-            }
-        });
         
         // Supprimer de Firestore
         deleteFromDB('members', memberId).then(() => {
@@ -3084,14 +3093,10 @@ function generateMonthlyReport() {
                 <!-- Section Paiements -->
                 <div style="margin-bottom: 30px;">
                     <h3 style="color: #6366f1; font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #6366f1; padding-bottom: 5px;">💳 PAIEMENTS DU MOIS</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                         <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
                             <p style="margin: 0; color: #10b981; font-weight: bold;">✓ Paiements effectués</p>
                             <p style="margin: 5px 0 0 0; font-size: 14px;">${paidPayments.length} (${formatCurrency(totalPaid)} FCFA)</p>
-                        </div>
-                        <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                            <p style="margin: 0; color: #f59e0b; font-weight: bold;">⏳ En attente</p>
-                            <p style="margin: 5px 0 0 0; font-size: 14px;">${pendingPayments.length} (${formatCurrency(totalPending)} FCFA)</p>
                         </div>
                         <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
                             <p style="margin: 0; color: #ef4444; font-weight: bold;">❌ Non payées</p>
@@ -3838,6 +3843,11 @@ function initPaymentsChart() {
     const ctx = document.getElementById('paymentsChart');
     if (!ctx) return;
     
+    // Détruire le graphique existant s'il existe
+    if (window.paymentsChartInstance) {
+        window.paymentsChartInstance.destroy();
+    }
+    
     // Préparer les données des 6 derniers mois
     const months = [];
     const paymentData = [];
@@ -3858,7 +3868,7 @@ function initPaymentsChart() {
         paymentData.push(monthPayments / 1000); // Convertir en milliers
     }
     
-    new Chart(ctx, {
+    window.paymentsChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: months,
@@ -3873,7 +3883,8 @@ function initPaymentsChart() {
                 pointBackgroundColor: '#667eea',
                 pointBorderColor: '#ffffff',
                 pointBorderWidth: 3,
-                pointRadius: 6
+                pointRadius: 6,
+                pointHoverRadius: 8
             }]
         },
         options: {
@@ -3882,19 +3893,28 @@ function initPaymentsChart() {
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Paiements: ' + context.parsed.y + 'k FCFA';
+                        }
+                    }
                 }
             },
             scales: {
                 y: {
-                    beginAtZero: true,
+                    min: 10,
+                    max: 100,
                     grid: {
                         color: '#f3f4f6',
                         drawBorder: false
                     },
                     ticks: {
                         color: '#6b7280',
+                        stepSize: 10,
                         callback: function(value) {
-                            return value + 'k FCFA';
+                            return value + 'k';
                         }
                     }
                 },
