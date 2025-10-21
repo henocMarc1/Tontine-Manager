@@ -457,6 +457,15 @@ function setupEventListeners() {
     
     const importBtn = document.getElementById('import-db-btn');
     if (importBtn) importBtn.addEventListener('click', importDatabase);
+    
+    // Filter payments button
+    const filterPaymentsBtn = document.getElementById('filter-payments-btn');
+    if (filterPaymentsBtn) {
+        filterPaymentsBtn.addEventListener('click', () => {
+            const searchTerm = document.getElementById('payment-search')?.value || '';
+            renderPayments(searchTerm);
+        });
+    }
 }
 
 // Switch between sections
@@ -2283,9 +2292,16 @@ async function processRoundPayout(tontineId, position) {
 function renderPayments(searchTerm = '') {
     const container = document.getElementById('payments-list');
     
+    // Récupérer les valeurs des filtres
+    const tontineFilter = document.getElementById('payment-tontine-filter')?.value || '';
+    const statusFilter = document.getElementById('payment-status-filter')?.value || '';
+    const monthFilter = document.getElementById('payment-month-filter')?.value || '';
+    
     let filteredPayments = state.payments;
+    
+    // Filtre par terme de recherche
     if (searchTerm) {
-        filteredPayments = state.payments.filter(payment => {
+        filteredPayments = filteredPayments.filter(payment => {
             const member = state.members.find(m => m.id === payment.memberId);
             const tontine = state.tontines.find(t => t.id === payment.tontineId);
             
@@ -2295,11 +2311,31 @@ function renderPayments(searchTerm = '') {
         });
     }
     
+    // Filtre par tontine
+    if (tontineFilter) {
+        filteredPayments = filteredPayments.filter(payment => payment.tontineId === tontineFilter);
+    }
+    
+    // Filtre par statut
+    if (statusFilter) {
+        filteredPayments = filteredPayments.filter(payment => payment.status === statusFilter);
+    }
+    
+    // Filtre par mois
+    if (monthFilter) {
+        filteredPayments = filteredPayments.filter(payment => {
+            const paymentDate = new Date(payment.date);
+            const filterDate = new Date(monthFilter + '-01');
+            return paymentDate.getFullYear() === filterDate.getFullYear() && 
+                   paymentDate.getMonth() === filterDate.getMonth();
+        });
+    }
+    
     if (filteredPayments.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-credit-card"></i>
-                <p>${searchTerm ? 'Aucun paiement trouvé' : 'Aucun paiement enregistré'}</p>
+                <p>${searchTerm || tontineFilter || statusFilter || monthFilter ? 'Aucun paiement trouvé avec ces filtres' : 'Aucun paiement enregistré'}</p>
                 <button class="btn btn-primary" onclick="openPaymentModal()">
                     Enregistrer le premier paiement
                 </button>
@@ -2961,6 +2997,58 @@ function generateMonthlyReport() {
         const totalPaid = paidPayments.reduce((sum, p) => sum + p.amount, 0);
         const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
         
+        // Calculer l'argent réellement en attente (cotisations non payées)
+        let unpaidContributions = 0;
+        let unpaidMembersCount = 0;
+        state.tontines.filter(t => t.status === 'active').forEach(tontine => {
+            const membersCount = tontine.membersWithPositions ? tontine.membersWithPositions.length : 
+                                 (tontine.members ? tontine.members.length : 0);
+            
+            // Calculer le nombre total de tours correctement
+            let totalRounds;
+            if (tontine.totalRounds && typeof tontine.totalRounds === 'number') {
+                totalRounds = tontine.totalRounds;
+            } else if (Array.isArray(tontine.rounds)) {
+                totalRounds = tontine.rounds.length;
+            } else if (tontine.rounds && typeof tontine.rounds === 'number') {
+                totalRounds = tontine.rounds;
+            } else {
+                totalRounds = membersCount;
+            }
+            
+            // Pour chaque tour possible de la tontine
+            for (let round = 1; round <= totalRounds; round++) {
+                const roundDueDate = calculateRoundDueDate(tontine, round);
+                
+                // Vérifier que la date est valide
+                if (Number.isNaN(roundDueDate.getTime())) continue;
+                
+                const year = roundDueDate.getFullYear();
+                const month = roundDueDate.getMonth();
+                
+                // Si ce tour est dû ce mois-ci ou avant (donc devrait être payé)
+                if (year < currentDate.getFullYear() || 
+                    (year === currentDate.getFullYear() && month <= currentDate.getMonth())) {
+                    
+                    // Compter combien de membres ont payé pour ce tour
+                    const paidMembers = state.payments.filter(p => 
+                        p.tontineId === tontine.id && 
+                        p.round === round && 
+                        p.type === 'contribution'
+                    ).length;
+                    
+                    // Compter les cotisations non payées seulement pour le mois sélectionné
+                    if (year === currentDate.getFullYear() && month === currentDate.getMonth()) {
+                        const unpaidMembers = membersCount - paidMembers;
+                        if (unpaidMembers > 0) {
+                            unpaidContributions += unpaidMembers * tontine.amount;
+                            unpaidMembersCount += unpaidMembers;
+                        }
+                    }
+                }
+            }
+        });
+        
         // Créer le contenu HTML du rapport
         const reportContent = `
             <div style="max-width: 800px; margin: 0 auto; font-family: Arial, sans-serif; background: white; padding: 40px;">
@@ -2996,7 +3084,7 @@ function generateMonthlyReport() {
                 <!-- Section Paiements -->
                 <div style="margin-bottom: 30px;">
                     <h3 style="color: #6366f1; font-size: 18px; margin-bottom: 15px; border-bottom: 2px solid #6366f1; padding-bottom: 5px;">💳 PAIEMENTS DU MOIS</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                         <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
                             <p style="margin: 0; color: #10b981; font-weight: bold;">✓ Paiements effectués</p>
                             <p style="margin: 5px 0 0 0; font-size: 14px;">${paidPayments.length} (${formatCurrency(totalPaid)} FCFA)</p>
@@ -3004,6 +3092,10 @@ function generateMonthlyReport() {
                         <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
                             <p style="margin: 0; color: #f59e0b; font-weight: bold;">⏳ En attente</p>
                             <p style="margin: 5px 0 0 0; font-size: 14px;">${pendingPayments.length} (${formatCurrency(totalPending)} FCFA)</p>
+                        </div>
+                        <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                            <p style="margin: 0; color: #ef4444; font-weight: bold;">❌ Non payées</p>
+                            <p style="margin: 5px 0 0 0; font-size: 14px;">${unpaidMembersCount} cotisations (${formatCurrency(unpaidContributions)} FCFA)</p>
                         </div>
                         <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; border-left: 4px solid #0ea5e9;">
                             <p style="margin: 0; color: #0ea5e9; font-weight: bold;">📊 Total collecté</p>
@@ -3109,12 +3201,14 @@ function generateTontinesTable() {
     `;
     
     activeTontines.forEach(tontine => {
+        const membersCount = tontine.membersWithPositions ? tontine.membersWithPositions.length : 
+                             (tontine.members ? tontine.members.length : 0);
         tableHTML += `
             <tr>
                 <td><strong>${tontine.name}</strong></td>
                 <td>${formatCurrency(tontine.amount)} FCFA</td>
                 <td>${tontine.frequency}</td>
-                <td>${tontine.members ? tontine.members.length : 0} membres</td>
+                <td>${membersCount} membres</td>
                 <td><span style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px;">ACTIVE</span></td>
             </tr>
         `;
