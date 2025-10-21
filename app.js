@@ -457,9 +457,6 @@ function setupEventListeners() {
     
     const importBtn = document.getElementById('import-db-btn');
     if (importBtn) importBtn.addEventListener('click', importDatabase);
-    
-    const filterBtn = document.getElementById('filter-payments-btn');
-    if (filterBtn) filterBtn.addEventListener('click', filterPayments);
 }
 
 // Switch between sections
@@ -2283,32 +2280,12 @@ async function processRoundPayout(tontineId, position) {
     }
 }
 
-function renderPayments(searchTerm = '', filters = null) {
+function renderPayments(searchTerm = '') {
     const container = document.getElementById('payments-list');
     
     let filteredPayments = state.payments;
-    
-    // Apply filters if provided
-    if (filters) {
-        if (filters.tontineId) {
-            filteredPayments = filteredPayments.filter(p => p.tontineId === filters.tontineId);
-        }
-        if (filters.status) {
-            filteredPayments = filteredPayments.filter(p => p.status === filters.status);
-        }
-        if (filters.month) {
-            const filterDate = new Date(filters.month + '-01');
-            filteredPayments = filteredPayments.filter(p => {
-                const paymentDate = new Date(p.date);
-                return paymentDate.getMonth() === filterDate.getMonth() && 
-                       paymentDate.getFullYear() === filterDate.getFullYear();
-            });
-        }
-    }
-    
-    // Apply search term
     if (searchTerm) {
-        filteredPayments = filteredPayments.filter(payment => {
+        filteredPayments = state.payments.filter(payment => {
             const member = state.members.find(m => m.id === payment.memberId);
             const tontine = state.tontines.find(t => t.id === payment.tontineId);
             
@@ -2417,21 +2394,6 @@ function updatePaymentFilters() {
         tontines.map(tontine => 
             `<option value="${tontine.id}">${tontine.name}</option>`
         ).join('');
-}
-
-function filterPayments() {
-    const tontineId = document.getElementById('payment-tontine-filter').value;
-    const status = document.getElementById('payment-status-filter').value;
-    const month = document.getElementById('payment-month-filter').value;
-    
-    const filters = {
-        tontineId: tontineId || null,
-        status: status || null,
-        month: month || null
-    };
-    
-    renderPayments('', filters);
-    showNotification('Filtres appliqués avec succès', 'success');
 }
 
 function deletePayment(paymentId) {
@@ -3147,13 +3109,12 @@ function generateTontinesTable() {
     `;
     
     activeTontines.forEach(tontine => {
-        const memberCount = tontine.membersWithPositions ? tontine.membersWithPositions.length : (tontine.totalRounds || 0);
         tableHTML += `
             <tr>
                 <td><strong>${tontine.name}</strong></td>
                 <td>${formatCurrency(tontine.amount)} FCFA</td>
                 <td>${tontine.frequency}</td>
-                <td>${memberCount} membres</td>
+                <td>${tontine.members ? tontine.members.length : 0} membres</td>
                 <td><span style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px;">ACTIVE</span></td>
             </tr>
         `;
@@ -3778,28 +3739,10 @@ function updateTontineStats() {
     document.getElementById('chart-growth').textContent = `Croissance de +${amountGrowth}% cette année`;
 }
 
-// Variable globale pour stocker l'instance du graphique
-let paymentsChartInstance = null;
-
 // Initialiser le graphique des paiements avec données réelles
 function initPaymentsChart() {
     const ctx = document.getElementById('paymentsChart');
-    if (!ctx) {
-        console.warn('Element paymentsChart non trouvé');
-        return;
-    }
-    
-    // Vérifier que Chart.js est chargé
-    if (typeof Chart === 'undefined') {
-        console.error('Chart.js n\'est pas chargé');
-        return;
-    }
-    
-    // Détruire l'instance existante si elle existe
-    if (paymentsChartInstance) {
-        paymentsChartInstance.destroy();
-        paymentsChartInstance = null;
-    }
+    if (!ctx) return;
     
     // Préparer les données des 6 derniers mois
     const months = [];
@@ -3821,8 +3764,7 @@ function initPaymentsChart() {
         paymentData.push(monthPayments / 1000); // Convertir en milliers
     }
     
-    try {
-        paymentsChartInstance = new Chart(ctx, {
+    new Chart(ctx, {
         type: 'line',
         data: {
             labels: months,
@@ -3878,10 +3820,6 @@ function initPaymentsChart() {
             }
         }
     });
-    } catch (error) {
-        console.error('Erreur lors de l\'initialisation du graphique:', error);
-        showNotification('Erreur d\'affichage du graphique', 'error');
-    }
 }
 
 // Mettre à jour l'état des tontines

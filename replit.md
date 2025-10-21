@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a French-language tontine (rotating savings group) management application built as a single-page web application. The system allows users to manage members, create tontine groups, and track payments with a modern, responsive interface. The application is built using vanilla HTML, CSS, and JavaScript with Firebase backend for authentication and data storage.
+This is a French-language tontine (rotating savings group) management application built as a single-page web application. The system allows users to manage members, create tontine groups, and track payments with a modern, responsive interface. The application is built using vanilla HTML, CSS, and JavaScript with client-side data persistence using localStorage.
 
 ## User Preferences
 
@@ -13,146 +13,81 @@ Preferred communication style: Simple, everyday language.
 ### Frontend Architecture
 - **Single Page Application (SPA)**: Built with vanilla JavaScript using a section-based navigation system
 - **Client-side State Management**: Global state object managing members, tontines, and payments
-- **Firebase Integration**: Cloud-based data persistence using Firestore with real-time sync
+- **Local Storage Persistence**: All data is stored locally in the browser using localStorage
 - **Responsive Design**: Mobile-first CSS approach with CSS custom properties for theming
 - **Component-based UI**: Modular sections with navigation-based routing (dashboard, members, tontines, payments)
 
 ### Technology Stack
 - **HTML5**: Semantic markup with French language support (`lang="fr"`)
 - **CSS3**: Modern styling with CSS custom properties, flexbox, and responsive design
-- **Vanilla JavaScript**: No external frameworks, pure ES6+ JavaScript with ES modules
-- **Firebase**: Backend services for authentication and Firestore database
+- **Vanilla JavaScript**: No external frameworks, pure ES6+ JavaScript
 - **Font Awesome 6.0**: Icon library for UI elements
-- **Chart.js**: Data visualization for payment statistics and trends
-- **jsPDF & jsPDF-AutoTable**: PDF generation for monthly reports
-- **Python HTTP Server**: Development server serving static files and Firebase config API
+- **SheetJS (xlsx)**: Excel file import/export functionality
+- **Local Storage API**: Browser-based data persistence
 
 ## Key Components
 
 ### Authentication System
-- **Firebase Authentication**: Email/password and Google OAuth authentication
-- **Session Management**: Firebase auth state persistence with automatic session handling
+- **User Authentication**: Simple localStorage-based authentication system
+- **Session Management**: Current user stored in localStorage with automatic redirect to login
 - **User Interface Updates**: Dynamic user information display in header
-- **Secure Login**: Protected routes with authentication guards
 
 ### State Management
 - **Global State Object**: Centralized state containing members, tontines, payments, and UI state
-- **Firestore Persistence**: All data stored in Firebase Firestore with real-time sync
-- **User Data Isolation**: Each user's data stored separately in Firestore (`users/{userId}/...`)
-- **State Initialization**: Automatic loading from Firestore on application start
+- **Data Persistence Functions**: `loadData()` and `saveData()` for localStorage operations
+- **State Initialization**: Automatic loading from localStorage on application start
 
 ### Core Modules
 1. **Member Management**: Add, edit, and track tontine participants
 2. **Tontine Groups**: Create and manage different tontine cycles with configurable parameters
 3. **Payment Processing**: Track payments with validation and payout processing
 4. **Dashboard**: Overview statistics and quick actions with real-time updates
-5. **Reporting**: PDF export of monthly reports with detailed statistics
 
 ### UI Features
 - **Theme Toggle**: Dark/light mode switching with CSS custom properties
 - **Navigation System**: Section-based routing with active state management
 - **Responsive Layout**: Container-based layout with mobile-first approach
 - **French Localization**: Complete French language interface
-- **Data Visualization**: Interactive charts showing payment trends and statistics
 
 ## Data Flow
 
-1. **Authentication Flow**: User login → Firebase Auth → redirect to dashboard or login page
-2. **Data Loading**: Application start → Firebase Auth check → load user data from Firestore
-3. **User Interactions**: UI actions → state updates → save to Firestore → real-time sync
+1. **Authentication Flow**: User login → localStorage verification → redirect to dashboard or login page
+2. **Data Loading**: Application start → `loadData()` → populate state from localStorage
+3. **User Interactions**: UI actions → state updates → `saveData()` → localStorage persistence
 4. **Section Navigation**: Navigation clicks → hide/show sections → update active states
 
 ## External Dependencies
 
-- **Firebase SDK 10.7.1**: Authentication and Firestore database
 - **Font Awesome 6.0**: CDN-hosted icon library for UI elements
-- **Chart.js**: Data visualization library for payment charts
-- **jsPDF & jsPDF-AutoTable**: PDF generation libraries
-- **Python**: HTTP server for development
+- **SheetJS (xlsx)**: CDN-hosted library for Excel file operations
+- **No Backend Dependencies**: Fully client-side application
 
 ## Deployment Strategy
 
-- **Static Hosting + Backend**: Frontend served as static files, Python server for Firebase config API
-- **Port 5000**: Application bound to 0.0.0.0:5000 for Replit compatibility
-- **Environment Variables**: Firebase credentials stored as Replit Secrets for security
-- **Browser Compatibility**: Modern browsers supporting ES6+ modules and Firebase SDK
+- **Static Hosting**: Can be deployed on any static hosting platform (Netlify, Vercel, GitHub Pages)
+- **No Build Process**: Direct file serving - no compilation or bundling required
+- **Browser Compatibility**: Modern browsers supporting ES6+ and localStorage
+- **Offline Capability**: Fully functional offline once loaded due to localStorage persistence
 
 ### File Structure
 ```
 /
-├── index.html          # Main application page (dashboard)
-├── login.html          # Authentication page
+├── index.html          # Main application page
 ├── styles.css          # Complete styling with theme support
-├── app.js              # Main application logic and UI
-├── firebase-config.js  # Firebase configuration loader (secure)
-├── firebase-auth.js    # Firebase authentication module
-├── firebase-db.js      # Firebase Firestore database module
-├── server.py           # Python HTTP server with Firebase config API
-└── logo tontine.png    # Application logo for reports
+├── app.js             # Main application logic
+├── login.html         # Authentication page (referenced but not included)
+└── assets/            # Additional assets (if any)
 ```
 
 ### Key Architectural Decisions
 
-1. **Firebase Backend**: Cloud-based authentication and Firestore database for reliable data persistence and multi-device access
-2. **Secure Configuration**: Firebase API keys loaded from environment variables via server endpoint for enhanced security
-3. **Vanilla JavaScript**: Avoided frameworks to keep the application lightweight and reduce dependencies
-4. **Section-based SPA**: Simple navigation system without complex routing libraries
-5. **CSS Custom Properties**: Modern approach for theming and maintainable styling
-6. **French Language**: Designed specifically for French-speaking users managing tontines
+1. **localStorage Over Database**: Chosen for simplicity and offline capability, suitable for small-scale personal/group use
+2. **Vanilla JavaScript**: Avoided frameworks to keep the application lightweight and reduce dependencies
+3. **Section-based SPA**: Simple navigation system without complex routing libraries
+4. **CSS Custom Properties**: Modern approach for theming and maintainable styling
+5. **French Language**: Designed specifically for French-speaking users managing tontines
 
 ## Recent Updates
-
-### Bug Fixes and Security Improvements (October 20, 2025)
-
-#### 1. Monthly PDF Report - Member Count Fix
-- **Issue**: Member count in PDF reports showed 0 or incorrect values
-- **Fix**: Changed from `tontine.members` to `tontine.membersWithPositions.length` with fallback to `tontine.totalRounds`
-- **Location**: `generateTontinesTable()` function in app.js (line 3150)
-- **Impact**: PDF reports now correctly display the number of members in each tontine
-
-#### 2. Payment Filter Button - Missing Event Listener
-- **Issue**: Filter button in payments section was not functional
-- **Fix**: Added event listener for `filter-payments-btn` that calls `filterPayments()` function
-- **Location**: Initialization section in app.js (lines 461-462)
-- **Implementation**: 
-  - Filter function supports multi-criteria filtering (tontine, status, month)
-  - Filters are passed to `renderPayments()` for display
-  - Success notification shown when filters are applied
-- **Impact**: Users can now filter payments by tontine, status, and month
-
-#### 3. Payment Evolution Chart - Chart.js Instance Management
-- **Issue**: Payment chart didn't render or caused errors on re-render
-- **Fix**: Implemented proper Chart.js instance lifecycle management
-- **Location**: `initPaymentsChart()` function in app.js (lines 3785-3890)
-- **Implementation**:
-  - Added global `paymentsChartInstance` variable to track Chart instance
-  - Destroy existing instance before creating new one to prevent memory leaks
-  - Added Chart.js availability check before initialization
-  - Enhanced error handling with try-catch block
-  - Chart displays last 6 months of payment data with proper formatting
-- **Impact**: Payment evolution chart now renders correctly without errors
-
-#### 4. Firebase Security - Environment Variables Migration
-- **Issue**: Firebase API keys were exposed in firebase-config.js file
-- **Fix**: Migrated all Firebase credentials to Replit Secrets (environment variables)
-- **Implementation**:
-  - `firebase-config.js`: Now exports `loadFirebaseConfig()` function that fetches config from server
-  - `server.py`: Added `/api/firebase-config` endpoint that reads from environment variables
-  - `firebase-auth.js`: Updated to use `loadFirebaseConfig()` instead of hardcoded values
-  - `firebase-db.js`: Updated to use `loadFirebaseConfig()` instead of hardcoded values
-  - All 7 Firebase credentials stored as Replit Secrets:
-    - FIREBASE_API_KEY
-    - FIREBASE_AUTH_DOMAIN
-    - FIREBASE_PROJECT_ID
-    - FIREBASE_STORAGE_BUCKET
-    - FIREBASE_MESSAGING_SENDER_ID
-    - FIREBASE_APP_ID
-    - FIREBASE_MEASUREMENT_ID
-- **Security Impact**: 
-  - API keys no longer visible in source code
-  - Credentials cannot be extracted from client-side files
-  - Keys managed securely through Replit Secrets interface
-  - Production-ready security configuration
 
 ### Penalty System Implementation (July 11, 2025)
 - **Automatic Penalty Calculation**: 10% penalty automatically applied for payments made after due date
@@ -238,18 +173,3 @@ Preferred communication style: Simple, everyday language.
 3. **Rotation Logic**: Payments are assigned to members based on continuing the position rotation
 4. **Visual Feedback**: Special styling and icons distinguish cagnotte from regular payments
 5. **Statistics Tracking**: Separate totals maintained for regular contributions and cagnotte amounts
-
-## Security Best Practices
-
-### Current Implementation
-1. **Environment Variables**: All Firebase credentials stored as Replit Secrets
-2. **Server-side Config**: Firebase config served via `/api/firebase-config` endpoint from environment variables
-3. **No Hardcoded Secrets**: Source code contains no sensitive credentials
-4. **User Data Isolation**: Firestore security rules isolate each user's data
-5. **Authentication Required**: All database operations require valid Firebase authentication
-
-### Recommendations
-- Keep Replit Secrets updated if Firebase credentials change
-- Never commit `.env` files or hardcoded credentials to version control
-- Regularly review Firebase security rules
-- Monitor Firebase usage for unusual activity
