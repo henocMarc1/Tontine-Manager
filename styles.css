@@ -4658,4 +4658,8 @@ textarea:focus {
         font-size: 1rem;
     }
 }
-
+@media (max-width: 600px) {
+  .logo-image {
+    width: 70px;
+  }
+}
