@@ -1927,7 +1927,7 @@ function updatePaymentAmount() {
     const penaltyInfoElement = document.getElementById('penalty-info');
     
     if (paymentCalculation.penalty > 0) {
-        const penaltyInfo = `\n--- INFORMATIONS DE PÉNALITÉ ---\nPaiement en retard de ${paymentCalculation.daysLate} jour(s)\nDate d'échéance: ${dueDate.toLocaleDateString('fr-FR')}\nMontant de base: ${formatCurrency(tontine.amount)} FCFA\nPénalité (10%): ${formatCurrency(paymentCalculation.penalty)} FCFA\nMontant total: ${formatCurrency(paymentCalculation.amount)} FCFA\n--- FIN INFORMATIONS ---`;
+        const penaltyInfo = `\n--- INFORMATIONS DE PÉNALITÉ ---\nPaiement en retard de ${paymentCalculation.daysLate} jour(s)\nDate d'échéance: ${dueDate.toLocaleDateString('fr-FR')}\nMontant de base: ${formatCurrency(tontine.amount)} FCFA\nPénalité (10%): ${formatCurrency(paymentCalculation.penalty)} FCFA\nMontant total: ${formatCurrency(paymentCalculation.amount)} FCFA\n---  ---`;
         notesInput.value = currentNotes + penaltyInfo;
         
         // Show visual indicator
