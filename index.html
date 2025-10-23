@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tontine Manager</title>
+    <title>Gestionnaire de Tontines</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -18,8 +18,7 @@
                 <img src="Logo tontine.PNG" 
                      alt="Logo Tmanager" 
                      class="logo-image"
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <span>Tmanager</span>
+                     onerror="this.style.display='none';">
             </div>
             <div class="header-actions">
                 <button class="theme-toggle" onclick="toggleTheme()" title="Basculer le mode sombre">
@@ -27,7 +26,7 @@
                 </button>
                 <div class="user-info">
                     <i class="fas fa-user-circle"></i>
-                    <span id="current-user-name">cc</span>
+                    <span id="current-user-name">Utilisateur</span>
                 </div>
                 <button class="logout-btn" onclick="logout()" title="Se déconnecter">
                     <i class="fas fa-sign-out-alt"></i>
@@ -408,7 +407,7 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="member-email">Email </label>
+                        <label for="member-email">Email</label>
                         <input type="email" id="member-email">
                     </div>
                     <div class="form-group">
@@ -418,7 +417,7 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="member-cni">CNI/Passeport  *</label>
+                        <label for="member-cni">CNI/Passeport</label>
                         <input type="text" id="member-cni">
                     </div>
                     <div class="form-group">

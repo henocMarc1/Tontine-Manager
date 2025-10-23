@@ -369,12 +369,15 @@ function updateUserDisplay(user) {
         console.log('Mise à jour du nom d\'utilisateur:', user);
         if (user.displayName) {
             displayName = user.displayName;
+        } else if (user.email) {
+            // Si pas de displayName, utiliser la partie avant @ de l'email
+            displayName = user.email.split('@')[0];
         } else {
             displayName = 'Utilisateur';
         }
         
         userNameSpan.textContent = displayName;
-        userNameSpan.title = `Connecté en tant que: ${user.email}`;
+        userNameSpan.title = `Connecté en tant que: ${user.email || 'Utilisateur'}`;
         console.log('Nom d\'utilisateur mis à jour:', displayName);
     } else {
         console.log('Aucun utilisateur fourni à updateUserDisplay');
@@ -1927,7 +1930,7 @@ function updatePaymentAmount() {
     const penaltyInfoElement = document.getElementById('penalty-info');
     
     if (paymentCalculation.penalty > 0) {
-        const penaltyInfo = `\n--- INFORMATIONS DE PÉNALITÉ ---\nPaiement en retard de ${paymentCalculation.daysLate} jour(s)\nDate d'échéance: ${dueDate.toLocaleDateString('fr-FR')}\nMontant de base: ${formatCurrency(tontine.amount)} FCFA\nPénalité (10%): ${formatCurrency(paymentCalculation.penalty)} FCFA\nMontant total: ${formatCurrency(paymentCalculation.amount)} FCFA\n---  ---`;
+        const penaltyInfo = `\n--- INFORMATIONS DE PÉNALITÉ ---\nPaiement en retard de ${paymentCalculation.daysLate} jour(s)\nDate d'échéance: ${dueDate.toLocaleDateString('fr-FR')}\nMontant de base: ${formatCurrency(tontine.amount)} FCFA\nPénalité (10%): ${formatCurrency(paymentCalculation.penalty)} FCFA\nMontant total: ${formatCurrency(paymentCalculation.amount)} FCFA\n--- FIN INFORMATIONS ---`;
         notesInput.value = currentNotes + penaltyInfo;
         
         // Show visual indicator
