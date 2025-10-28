@@ -2810,7 +2810,7 @@ async function printPaymentReceipt(paymentId) {
             <div class="receipt-container">
                 <div class="header">
                     <div class="logo">
-                        <img src="Logo tontine.PNG" alt="Logo" onerror="this.style.display='none'">
+                        <img src="Logo tontine.png" alt="Logo" onerror="this.style.display='none'">
                     </div>
                     <h1 class="title">REÇU DE PAIEMENT</h1>
                     <p class="subtitle">Gestionnaire de Tontines</p>
@@ -3066,7 +3066,7 @@ function generateMonthlyReport() {
             <div style="max-width: 800px; margin: 0 auto; font-family: Arial, sans-serif; background: white; padding: 40px;">
                 <!-- En-tête avec logo -->
                 <div style="text-align: center; margin-bottom: 40px; position: relative;">
-                    <img src="Logo tontine.PNG" alt="Logo Tontine" style="position: absolute; top: 0; right: 0; width: 80px; height: 80px;">
+                    <img src="Logo tontine.png" alt="Logo Tontine" style="position: absolute; top: 0; right: 0; width: 80px; height: 80px;">
                     <h1 style="color: #6366f1; font-size: 28px; margin: 0; margin-bottom: 10px;">RAPPORT MENSUEL</h1>
                     <h2 style="color: #64748b; font-size: 18px; margin: 0;">${monthName.charAt(0).toUpperCase() + monthName.slice(1)}</h2>
                     <p style="color: #9ca3af; font-size: 12px; margin: 10px 0;">Généré le: ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
